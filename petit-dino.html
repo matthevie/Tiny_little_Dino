@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le petit dino</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #bfe4ee;
+    --ink: #22402a;
+    --paper: #f7fbf0;
+    --line: #22402a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1330;
+      --ink: #e8efff;
+      --paper: #151a38;
+      --line: #e8efff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1330;
+    --ink: #e8efff;
+    --paper: #151a38;
+    --line: #e8efff;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: "Pixelify Sans", ui-monospace, "Courier New", monospace;
+  }
+  #scene {
+    position: fixed;
+    left: 0;
+    top: 0;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: manipulation;
+    cursor: crosshair;
+  }
+
+  #phrase {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    max-width: min(330px, calc(100vw - 32px));
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 13px 10px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 3px solid var(--line);
+    box-shadow: 4px 4px 0 var(--line);
+    font-size: 16px;
+    line-height: 1.3;
+    opacity: 0;
+    transition: opacity 0.9s ease;
+    pointer-events: none;
+  }
+  #phrase.on { opacity: 1; }
+  #phrase.out { transition-duration: 1.2s; }
+  #dot {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--line);
+    box-sizing: border-box;
+  }
+
+  #hint {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--b) * 3 + 44px + env(safe-area-inset-bottom, 0px));
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    text-align: center;
+    color: var(--ink);
+    font-size: 14px;
+    opacity: 0.8;
+    transition: opacity 1.4s ease;
+    pointer-events: none;
+    background: var(--paper);
+    padding: 4px 8px;
+    border: 2px solid var(--line);
+  }
+  #hint.gone { opacity: 0; }
+
+
+  :root { --b: 56px; }
+  @media (max-height: 480px) { :root { --b: 44px; } }
+  .ctl {
+    appearance: none; -webkit-appearance: none;
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    border: 3px solid var(--line);
+    box-shadow: 3px 3px 0 var(--line);
+    font: 600 16px/1 "Pixelify Sans", ui-monospace, "Courier New", monospace;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ctl.press { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--line); }
+  .ctl:focus-visible { outline: 3px dashed var(--ink); outline-offset: 3px; }
+  .pad {
+    position: fixed;
+    left: max(18px, env(safe-area-inset-left, 0px));
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: repeat(3, var(--b));
+    grid-template-rows: repeat(3, var(--b));
+    gap: 4px;
+    z-index: 3;
+  }
+  .pad .up { grid-column: 2; grid-row: 1; }
+  .pad .left { grid-column: 1; grid-row: 2; }
+  .pad .right { grid-column: 3; grid-row: 2; }
+  .pad .down { grid-column: 2; grid-row: 3; }
+  .arr { display: block; margin: auto; width: 0; height: 0; border: 0 solid transparent; }
+  .up .arr { border-width: 0 9px 12px; border-bottom-color: var(--ink); }
+  .down .arr { border-width: 12px 9px 0; border-top-color: var(--ink); }
+  .left .arr { border-width: 9px 12px 9px 0; border-right-color: var(--ink); }
+  .right .arr { border-width: 9px 0 9px 12px; border-left-color: var(--ink); }
+  #eat {
+    position: fixed;
+    right: max(18px, env(safe-area-inset-right, 0px));
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    width: calc(var(--b) * 1.7);
+    height: calc(var(--b) * 1.7);
+    z-index: 3;
+  }
+  #eat.ready { background: #ffd84d; color: #22402a; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #phrase, #phrase.out, #hint { transition-duration: 0.2s; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="Un petit dinosaure pixélisé se promène dans un pré et mange des fleurs" role="img"></canvas>
+<div id="phrase" role="status" aria-live="polite"><i id="dot"></i><span id="txt"></span></div>
+<div id="hint">Guide le dino avec les flèches, puis appuie sur Manger. Touche l'herbe pour planter une fleur.</div>
+<div class="pad" aria-label="Commandes de déplacement">
+  <button class="ctl up" data-dir="up" aria-label="Haut"><i class="arr"></i></button>
+  <button class="ctl left" data-dir="left" aria-label="Gauche"><i class="arr"></i></button>
+  <button class="ctl right" data-dir="right" aria-label="Droite"><i class="arr"></i></button>
+  <button class="ctl down" data-dir="down" aria-label="Bas"><i class="arr"></i></button>
+</div>
+<button class="ctl" id="eat" aria-label="Manger la fleur">Manger</button>
+
+<script>
+(() => {
+  const cv = document.getElementById('scene');
+  const ctx = cv.getContext('2d');
+  const box = document.getElementById('phrase');
+  const txtEl = document.getElementById('txt');
+  const dotEl = document.getElementById('dot');
+  const hint = document.getElementById('hint');
+  const eatBtn = document.getElementById('eat');
+  const root = document.documentElement;
+  const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Palettes ---------- */
+  const PAL = {
+    day: {
+      sky: ['#bfe4ee', '#cdeaf0', '#dcf0ee', '#ebf5e8'],
+      sun: '#fff0a8', halo: '#f6f7c9', stars: false,
+      hillFar: '#b4d9a0', hillNear: '#9dcc8c',
+      grass: '#b9d27c', gd: '#a3bd68', gl: '#cbe390',
+      cloud: '#ffffff', stem: '#3f8a3c', shadow: 'rgba(50,80,30,0.3)', marker: '#1f4a2c'
+    },
+    night: {
+      sky: ['#0f1330', '#171c42', '#232a58', '#323a6e'],
+      sun: '#f4f1cf', halo: '#3c4478', stars: true,
+      hillFar: '#2b4060', hillNear: '#223751',
+      grass: '#27473f', gd: '#1e3a35', gl: '#315a4c',
+      cloud: '#3b4373', stem: '#3c8f62', shadow: 'rgba(0,0,0,0.35)', marker: '#ffffff'
+    }
+  };
+  const DC = { b: '#2fae5a', s: '#23884a', l: '#e6f5c8', e: '#0f2416' };
+  const OUTLINE = '#143d27';
+
+  /* ---------- Fleurs et phrases ---------- */
+  const COLORS = {
+    rouge:  { c: '#e5383b', center: '#f9c74f' },
+    jaune:  { c: '#f9d71c', center: '#e07a1f' },
+    bleu:   { c: '#3f7cf4', center: '#f9c74f' },
+    rose:   { c: '#f48fc4', center: '#f9c74f' },
+    violet: { c: '#9a5cf0', center: '#f9c74f' },
+    blanc:  { c: '#f7f7f2', center: '#f2b632' }
+  };
+  const PHRASES = {
+    rouge:  ["You are the prettiest one ever.", "You light up every room you walk into.", "You look amazing today."],
+    jaune:  ["You are pure sunshine.", "Your smile could fix anything.", "You make every day brighter."],
+    bleu:   ["You are calm in all the right ways.", "You make everything feel easier.", "You are someone people trust."],
+    rose:   ["You are impossibly sweet.", "Everyone is lucky to know you.", "You have the kindest heart."],
+    violet: ["You are one of a kind.", "You have a magic nobody can copy.", "You are so much cooler than you think."],
+    blanc:  ["You are a breath of fresh air.", "You are simply wonderful.", "You deserve all the good things."]
+  };
+  const NAMES = Object.keys(COLORS);
+
+  /* ---------- Sprites du dino ---------- */
+  const HEAD = ['.bbbbb', 'bbbbeb', 'bbbbbb', '.bbbb.'];
+  const BODY = [
+    '.........bbb',
+    '.........bbb',
+    'b.......bbbbb',
+    'bb.....bbbbbbb',
+    'bbb..bbbbsbbbb',
+    '.bbsbbbbbbbbbb',
+    '..bbbbsbbbbbb',
+    '...lllllbbbbb'
+  ];
+  const LEGS_A = ['....bb..bb', '....dd..dd'];
+  const LEGS_B = ['...bb....bb', '...dd....dd'];
+  DC.d = '#1f6e3c';
+
+  /* ---------- État ---------- */
+  let S = 4, W = 0, H = 0, horizon = 0, pal = PAL.day, bg = null;
+  let flowers = [], particles = [], clouds = [];
+  let spawnT = 2, time = 0, inited = false, lastSaid = '';
+  const dino = { x: 0, y: 0, face: 1, state: 'idle', t: 0, timer: 1, frame: 0, ft: 0, target: null, ate: false };
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const isDark = () => root.dataset.theme === 'dark' || (root.dataset.theme !== 'light' && darkMQ.matches);
+  const minY = () => horizon + 14;
+  const maxY = () => H - 3;
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ---------- Décor ---------- */
+  function buildBg() {
+    pal = isDark() ? PAL.night : PAL.day;
+    bg = document.createElement('canvas');
+    bg.width = W; bg.height = H;
+    const g = bg.getContext('2d');
+    const r = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    const rnd = mulberry32(7);
+
+    const bh = Math.ceil(horizon / pal.sky.length);
+    pal.sky.forEach((c, i) => r(0, i * bh, W, bh + 1, c));
+
+    if (pal.stars) {
+      const n = Math.floor(W * horizon / 240);
+      for (let i = 0; i < n; i++) {
+        r(Math.floor(rnd() * W), Math.floor(rnd() * horizon * 0.85), 1, 1, rnd() < 0.3 ? '#ffffff' : '#9aa6d8');
+      }
+    }
+
+    const cx = Math.round(W * 0.82), cy = Math.round(horizon * 0.3), R = 8;
+    for (let dy = -R - 4; dy <= R + 4; dy++) {
+      for (let dx = -R - 4; dx <= R + 4; dx++) {
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= R * R) r(cx + dx, cy + dy, 1, 1, pal.sun);
+        else if (d2 <= (R + 4) * (R + 4) && ((dx + dy) & 1) === 0) r(cx + dx, cy + dy, 1, 1, pal.halo);
+      }
+    }
+
+    for (let x = 0; x < W; x++) {
+      const h2 = horizon - 6 - Math.round(4 * Math.sin(x * 0.03 + 1) + 3 * Math.sin(x * 0.011 + 2));
+      r(x, h2, 1, horizon - h2 + 1, pal.hillFar);
+    }
+    for (let x = 0; x < W; x++) {
+      const h1 = horizon - 2 - Math.round(2 * Math.sin(x * 0.05 + 3) + 1.5 * Math.sin(x * 0.017));
+      r(x, h1, 1, horizon - h1 + 1, pal.hillNear);
+    }
+
+    r(0, horizon, W, H - horizon, pal.grass);
+    r(0, horizon, W, 1, pal.gd);
+    const n = Math.floor(W * (H - horizon) / 70);
+    for (let i = 0; i < n; i++) {
+      const x = 1 + Math.floor(rnd() * (W - 2));
+      const y = horizon + 2 + Math.floor(rnd() * (H - horizon - 2));
+      const c = rnd() < 0.5 ? pal.gd : pal.gl;
+      r(x, y, 1, 1, c); r(x - 1, y - 1, 1, 1, c); r(x + 1, y - 1, 1, 1, c);
+    }
+  }
+
+  function makeClouds() {
+    clouds = [];
+    for (let i = 0; i < 4; i++) {
+      clouds.push({
+        x: rand(0, W), y: Math.floor(rand(4, Math.max(8, horizon * 0.5))),
+        k: Math.random() < 0.5 ? 1 : 2, v: reduce ? 0 : rand(1.5, 3.5)
+      });
+    }
+  }
+
+  /* ---------- Fleurs ---------- */
+  function plant(x, y, mature) {
+    const col = NAMES[Math.floor(Math.random() * NAMES.length)];
+    flowers.push({
+      x: Math.round(Math.min(W - 20, Math.max(20, x))),
+      y: Math.round(Math.min(maxY(), Math.max(minY(), y))),
+      col, grow: mature ? 1 : 0
+    });
+  }
+
+  function drawFlower(f) {
+    const info = COLORS[f.col];
+    const x = Math.round(f.x), y = Math.round(f.y);
+    const sh = Math.max(1, Math.round(4 * f.grow));
+    ctx.fillStyle = pal.stem;
+    ctx.fillRect(x, y - sh, 1, sh);
+    if (f.grow > 0.5) ctx.fillRect(x + 1, y - Math.ceil(sh / 2) - 1, 1, 1);
+    if (f.grow < 0.6) return;
+    const top = y - sh - 3;
+    ctx.fillStyle = info.c;
+    ctx.fillRect(x - 1, top, 3, 1);
+    ctx.fillRect(x - 2, top + 1, 5, 1);
+    ctx.fillRect(x - 1, top + 2, 3, 1);
+    ctx.fillStyle = info.center;
+    ctx.fillRect(x, top + 1, 1, 1);
+  }
+
+  function burst(f) {
+    const c = COLORS[f.col].c;
+    for (let i = 0; i < 8; i++) {
+      particles.push({ x: f.x, y: f.y - 6, vx: rand(-14, 14), vy: rand(-26, -8), life: rand(0.5, 0.9), c });
+    }
+  }
+
+  /* ---------- Phrases ---------- */
+  let showT, hideT;
+  function say(colName) {
+    const info = COLORS[colName];
+    const list = PHRASES[colName];
+    let txt = list[Math.floor(Math.random() * list.length)];
+    if (txt === lastSaid) txt = list[(list.indexOf(txt) + 1) % list.length];
+    lastSaid = txt;
+    clearTimeout(showT); clearTimeout(hideT);
+    const visible = box.classList.contains('on');
+    box.classList.remove('on');
+    showT = setTimeout(() => {
+      txtEl.textContent = txt;
+      dotEl.style.background = info.c;
+      box.classList.add('out');
+      box.classList.add('on');
+      hideT = setTimeout(() => { box.classList.remove('on'); }, 3800);
+    }, visible ? 450 : 0);
+  }
+
+  /* ---------- Dino : commandes et comportement ---------- */
+  const keys = { left: false, right: false, up: false, down: false };
+  let eatReq = false;
+
+  function findReach() {
+    const d = dino;
+    const mx = d.x + d.face * 8;
+    let best = null, bd = 1e9;
+    for (const f of flowers) {
+      if (f.grow < 1) continue;
+      const dx = f.x - mx, dy = f.y - d.y;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 6) continue;
+      const dist = Math.hypot(dx, dy);
+      if (dist < bd) { bd = dist; best = f; }
+    }
+    return best;
+  }
+
+  function update(dt) {
+    time += dt;
+    for (const f of flowers) if (f.grow < 1) f.grow = Math.min(1, f.grow + dt / 1.2);
+
+    spawnT -= dt;
+    if (spawnT <= 0) {
+      spawnT = rand(2.5, 5.5);
+      if (flowers.length < 16) plant(rand(20, W - 20), rand(minY(), maxY()), false);
+    }
+
+    for (const c of clouds) {
+      c.x += c.v * dt;
+      if (c.x > W + 10) c.x = -20;
+    }
+    particles = particles.filter(p => {
+      p.life -= dt; p.vy += 50 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      return p.life > 0;
+    });
+
+    const d = dino;
+    if (d.state === 'eat') {
+      d.t += dt;
+      const f = d.target;
+      if (f && flowers.includes(f)) {
+        const tx = f.x - d.face * 8, ty = f.y;
+        const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy);
+        if (dist > 0.01) {
+          const sp = Math.min(dist, 30 * dt);
+          d.x += dx / dist * sp; d.y += dy / dist * sp;
+        }
+      }
+      if (!d.ate && d.t > 0.65) {
+        d.ate = true;
+        const i = f ? flowers.indexOf(f) : -1;
+        if (i >= 0) { flowers.splice(i, 1); burst(f); say(f.col); }
+      }
+      if (d.t > (f ? 1.5 : 0.6)) { d.state = 'idle'; d.frame = 0; d.target = null; }
+      eatReq = false;
+    } else {
+      const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      const iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+      if (ix || iy) {
+        const n = Math.hypot(ix, iy);
+        d.x += ix / n * 22 * dt; d.y += iy / n * 22 * dt;
+        d.x = Math.min(W - 10, Math.max(10, d.x));
+        d.y = Math.min(maxY(), Math.max(minY(), d.y));
+        if (ix) d.face = ix > 0 ? 1 : -1;
+        d.state = 'walk';
+        d.ft += dt;
+        if (d.ft > 0.2) { d.ft = 0; d.frame ^= 1; }
+      } else { d.state = 'idle'; d.frame = 0; d.ft = 0; }
+      if (eatReq) {
+        eatReq = false;
+        const f = findReach();
+        d.state = 'eat'; d.t = 0; d.ate = !f; d.target = f;
+      }
+    }
+    eatBtn.classList.toggle('ready', d.state !== 'eat' && !!findReach());
+  }
+
+  /* ---------- Rendu ---------- */
+  function drawDino() {
+    const d = dino;
+    const x = Math.round(d.x), y = Math.round(d.y);
+    const walking = d.state === 'walk';
+    const bob = walking && d.frame === 1 ? -1 : 0;
+    const px = new Map();
+    const put = (rows, c0, r0) => {
+      rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          const ch = row[c];
+          if (ch === '.') continue;
+          const col = c0 + c;
+          const sx = d.face === 1 ? x - 8 + col : x + 8 - col;
+          const sy = y - 12 + r0 + r;
+          px.set(sx + ',' + sy, [sx, sy, ch]);
+        }
+      });
+    };
+    put(walking && d.frame === 1 ? LEGS_B : LEGS_A, 0, 11);
+    put(BODY, 0, 3 + bob);
+    if (d.state === 'eat') {
+      const chew = Math.floor(d.t / 0.18) % 2;
+      put(HEAD, 11, 5 + chew);
+    } else {
+      put(HEAD, 9, bob);
+    }
+    ctx.fillStyle = OUTLINE;
+    for (const [sx, sy] of px.values()) {
+      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!px.has((sx + ox) + ',' + (sy + oy))) ctx.fillRect(sx + ox, sy + oy, 1, 1);
+      }
+    }
+    for (const [sx, sy, ch] of px.values()) {
+      ctx.fillStyle = DC[ch];
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+  }
+
+  function render() {
+    ctx.drawImage(bg, 0, 0);
+
+    ctx.fillStyle = pal.cloud;
+    for (const c of clouds) {
+      const x = Math.round(c.x), y = c.y, k = c.k;
+      ctx.fillRect(x + 2 * k, y, 4 * k, k);
+      ctx.fillRect(x + k, y + k, 6 * k, k);
+      ctx.fillRect(x, y + 2 * k, 8 * k, k);
+    }
+
+    ctx.fillStyle = pal.shadow;
+    for (const f of flowers) ctx.fillRect(Math.round(f.x) - 1, Math.round(f.y), 3, 1);
+    ctx.fillRect(Math.round(dino.x) - 6, Math.round(dino.y), 12, 1);
+
+    const items = flowers.map(f => ({ y: f.y, draw: () => drawFlower(f) }));
+    items.push({ y: dino.y + 0.5, draw: drawDino });
+    items.sort((a, b) => a.y - b.y);
+    for (const it of items) it.draw();
+
+    if (dino.state !== 'eat') {
+      const f = findReach();
+      if (f) {
+        const my = Math.round(f.y) - 11 - (Math.floor(time * 3) % 2);
+        ctx.fillStyle = pal.marker;
+        ctx.fillRect(Math.round(f.x) - 1, my, 3, 1);
+        ctx.fillRect(Math.round(f.x), my + 1, 1, 1);
+      }
+    }
+
+    for (const p of particles) {
+      ctx.fillStyle = p.c;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+    }
+  }
+
+  /* ---------- Boucle et redimensionnement ---------- */
+  function resize() {
+    S = Math.max(3, Math.round(innerWidth / 300));
+    W = Math.ceil(innerWidth / S);
+    H = Math.ceil(innerHeight / S);
+    cv.width = W; cv.height = H;
+    cv.style.width = W * S + 'px';
+    cv.style.height = H * S + 'px';
+    horizon = Math.round(H * 0.42);
+    buildBg();
+    makeClouds();
+    if (!inited) {
+      inited = true;
+      for (let i = 0; i < 7; i++) plant(rand(20, W - 20), rand(minY(), maxY()), true);
+      dino.x = W / 2; dino.y = (minY() + maxY()) / 2;
+    } else {
+      for (const f of flowers) {
+        f.x = Math.min(W - 20, Math.max(20, f.x));
+        f.y = Math.min(maxY(), Math.max(minY(), f.y));
+      }
+      dino.x = Math.min(W - 10, Math.max(10, dino.x));
+      dino.y = Math.min(maxY(), Math.max(minY(), dino.y));
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  cv.addEventListener('pointerdown', e => {
+    if (flowers.length < 30) plant(e.clientX / S, e.clientY / S, false);
+    hint.classList.add('gone');
+  });
+
+  const gotInput = () => hint.classList.add('gone');
+  document.querySelectorAll('.pad .ctl').forEach(el => {
+    const dir = el.dataset.dir;
+    const on = e => { e.preventDefault(); keys[dir] = true; el.classList.add('press'); gotInput(); };
+    const off = () => { keys[dir] = false; el.classList.remove('press'); };
+    el.addEventListener('pointerdown', on);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, off));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
+  eatBtn.addEventListener('pointerdown', e => {
+    e.preventDefault(); eatReq = true; eatBtn.classList.add('press'); gotInput();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t =>
+    eatBtn.addEventListener(t, () => eatBtn.classList.remove('press')));
+  eatBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  const KEYMAP = {
+    arrowleft: 'left', a: 'left', q: 'left',
+    arrowright: 'right', d: 'right',
+    arrowup: 'up', w: 'up', z: 'up',
+    arrowdown: 'down', s: 'down'
+  };
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (KEYMAP[k]) { keys[KEYMAP[k]] = true; e.preventDefault(); gotInput(); }
+    else if (k === ' ' || k === 'enter' || k === 'e') {
+      e.preventDefault();
+      if (!e.repeat) { eatReq = true; gotInput(); }
+    }
+  });
+  addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (KEYMAP[k]) keys[KEYMAP[k]] = false;
+  });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  darkMQ.addEventListener('change', buildBg);
+  new MutationObserver(buildBg).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  addEventListener('resize', resize);
+
+  resize();
+  setTimeout(() => hint.classList.add('gone'), 8000);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

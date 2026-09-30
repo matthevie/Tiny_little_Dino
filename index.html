@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dino & Flowers</title>
+  <style>
+  /* -------------------- GLOBAL -------------------- */
+  body {
+    margin: 0;
+    background: url("images/background.png") repeat;
+    image-rendering: pixelated;
+    overflow: hidden;
+    font-family: monospace;
+    color: white;
+  }
+
+  /* -------------------- CANVAS -------------------- */
+  #gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* -------------------- MENU -------------------- */
+  #menu {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+
+  #menu h1 { font-size: 32px; margin-bottom: 20px; }
+  #menu button { padding: 10px 20px; font-size: 20px; cursor: pointer; }
+
+  /* -------------------- HUD -------------------- */
+  #hud {
+    position: fixed;
+    top: 10px; left: 10px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid white;
+    border-radius: 8px;
+    font-family: monospace;
+    color: white;
+    z-index: 60;
+    max-width: 40vw;
+  }
+
+  #hud-message { font-size: 14px; margin-bottom: 6px; }
+  #hud-score { font-size: 12px; opacity: 0.8; }
+
+  /* -------------------- PIXEL POP -------------------- */
+  .pixel-pop {
+    position: absolute; width: 16px; height: 16px; background: white;
+    opacity: 1; animation: pop 0.4s steps(3) forwards;
+  }
+
+  @keyframes pop { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+
+  /* -------------------- TOUCH CONTROLS -------------------- */
+  #touch-left, #touch-right, #touch-up, #touch-down { position: fixed; z-index: 50; }
+  #touch-left { left: 0; top: 0; width: 33vw; height: 100vh; }
+  #touch-right { right: 0; top: 0; width: 33vw; height: 100vh; }
+  #touch-up { left: 33vw; top: 0; width: 34vw; height: 50vh; }
+  #touch-down { left: 33vw; bottom: 0; width: 34vw; height: 50vh; }
+  </style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="menu">
+  <h1>Dino & Flowers</h1>
+  <button id="startBtn">Start</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-message"></div>
+  <div id="hud-score"></div>
+</div>
+
+<!-- CANVAS -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- TOUCH ZONES -->
+<div id="touch-left"></div>
+<div id="touch-right"></div>
+<div id="touch-up"></div>
+<div id="touch-down"></div>
+
+<script>
+/* Canvas setup */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+function fitCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+/* HUD */
+const hudMessage = document.getElementById('hud-message');
+const hudScore = document.getElementById('hud-score');
+let score = 0;
+function showHUDMessage(text) { hudMessage.textContent = text; }
+function updateScore() { score++; hudScore.textContent = 'Fleurs mangées : ' + score; }
+hudScore.textContent = 'Fleurs mangées : ' + score;
+
+/* Dino */
+const dino = { x: 200, y: 200, size: 32, speed: 3, sprite: new Image() };
+const dinoFrames = ['images/dino_walk1.png','images/dino_walk2.png','images/dino_walk3.png'];
+let dinoFrameIndex = 0, dinoFrameTimer = 0;
+function animateDino() {
+  dinoFrameTimer++;
+  if (dinoFrameTimer > 10) {
+    dinoFrameIndex = (dinoFrameIndex + 1) % dinoFrames.length;
+    dino.sprite.src = dinoFrames[dinoFrameIndex];
+    dinoFrameTimer = 0;
+  }
+}
+dino.sprite.src = dinoFrames[0];
+
+/* Zone limits */
+const zone = { x: 100, y: 100, width: 600, height: 400 };
+
+/* Flowers */
+const flowers = [];
+const flowerSprites = [
+  { src: 'images/fleur_rose.png', message: 'for the prettiest boy ever', color: 'pink' },
+  { src: 'images/fleur_bleue.png', message: 'you are so precious', color: 'blue' },
+  { src: 'images/fleur_jaune.png', message: 'Thank you for being so good, so sweet, so kind', color: 'yellow' },
+  { src: 'images/fleur_blanche.png', message: 'you shine so softly', color: 'white' }
+];
+
+/* Sounds (play after user interaction) */
+const flowerSounds = {
+  pink: new Audio('sounds/sound_pink.wav'),
+  blue: new Audio('sounds/sound_blue.wav'),
+  yellow: new Audio('sounds/sound_yellow.wav'),
+  white: new Audio('sounds/sound_white.wav')
+};
+
+function spawnFlower() {
+  const f = flowerSprites[Math.floor(Math.random() * flowerSprites.length)];
+  const size = 16;
+  const flower = {
+    x: zone.x + Math.random() * Math.max(0, zone.width - size),
+    y: zone.y + Math.random() * Math.max(0, zone.height - size),
+    size,
+    sprite: new Image(),
+    message: f.message,
+    color: f.color
+  };
+  flower.sprite.src = f.src;
+  flowers.push(flower);
+}
+
+/* Pixel pop */
+function pixelPop(x, y) {
+  const pop = document.createElement('div');
+  pop.classList.add('pixel-pop');
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 400);
+}
+
+/* Input */
+const keys = { left: false, right: false, up: false, down: false };
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'q') keys.left = true;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+  if (e.key === 'ArrowUp' || e.key === 'z') keys.up = true;
+  if (e.key === 'ArrowDown' || e.key === 's') keys.down = true;
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'q') keys.left = false;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+  if (e.key === 'ArrowUp' || e.key === 'z') keys.up = false;
+  if (e.key === 'ArrowDown' || e.key === 's') keys.down = false;
+});
+
+/* Touch controls */
+function bindInvisibleTouchControls() {
+  const activate = (key) => keys[key] = true;
+  const deactivate = (key) => keys[key] = false;
+  ['left','right','up','down'].forEach(dir => {
+    const touchZone = document.getElementById('touch-' + dir);
+    touchZone.addEventListener('touchstart', (e) => { e.preventDefault(); activate(dir); });
+    touchZone.addEventListener('touchend', (e) => { e.preventDefault(); deactivate(dir); });
+    touchZone.addEventListener('touchcancel', (e) => { e.preventDefault(); deactivate(dir); });
+  });
+}
+bindInvisibleTouchControls();
+
+/* Update */
+function update() {
+  if (keys.left) dino.x -= dino.speed;
+  if (keys.right) dino.x += dino.speed;
+  if (keys.up) dino.y -= dino.speed;
+  if (keys.down) dino.y += dino.speed;
+
+  // Keep dino inside zone
+  if (dino.x < zone.x) dino.x = zone.x;
+  if (dino.x > zone.x + zone.width - dino.size) dino.x = zone.x + zone.width - dino.size;
+  if (dino.y < zone.y) dino.y = zone.y;
+  if (dino.y > zone.y + zone.height - dino.size) dino.y = zone.y + zone.height - dino.size;
+
+  // Collision with flowers
+  for (let i = flowers.length - 1; i >= 0; i--) {
+    const f = flowers[i];
+    const dx = (dino.x + dino.size/2) - (f.x + f.size/2);
+    const dy = (dino.y + dino.size/2) - (f.y + f.size/2);
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const threshold = (dino.size + f.size) * 0.5;
+    if (dist < threshold) {
+      showHUDMessage(f.message);
+      updateScore();
+      const sound = flowerSounds[f.color];
+      if (sound && typeof sound.play === 'function') { try { sound.play(); } catch(e){} }
+      pixelPop(f.x, f.y);
+      flowers.splice(i,1);
+    }
+  }
+
+  animateDino();
+}
+
+/* Draw */
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Optional: draw zone border for debugging
+  // ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+  ctx.drawImage(dino.sprite, dino.x, dino.y, dino.size, dino.size);
+  flowers.forEach(f => ctx.drawImage(f.sprite, f.x, f.y, f.size, f.size));
+}
+
+let animId = null;
+function loop() { update(); draw(); animId = requestAnimationFrame(loop); }
+
+/* Start game only after user clicks Start (enables audio in many browsers) */
+const startBtn = document.getElementById('startBtn');
+let flowerIntervalId = null;
+startBtn.addEventListener('click', () => {
+  document.getElementById('menu').style.display = 'none';
+  // ensure dino starts inside zone
+  dino.x = Math.max(zone.x, Math.min(dino.x, zone.x + zone.width - dino.size));
+  dino.y = Math.max(zone.y, Math.min(dino.y, zone.y + zone.height - dino.size));
+  // start spawning and loop
+  if (!flowerIntervalId) flowerIntervalId = setInterval(spawnFlower, 2000);
+  if (!animId) loop();
+});
+
+/* optional: create a few initial flowers inside the zone */
+for (let i=0;i<3;i++) spawnFlower();
+
+</script>
+</body>
+</html>
